@@ -1,3 +1,4 @@
+**NOTE: This tool is design for Cxbx-Reloaded developers to troubleshoot, add, and validate OOVPA signatures.**
 # CHPATRI
 * Convert
 * HLE Cache File
