@@ -1,0 +1,90 @@
+/*
+MIT License
+
+Copyright (c) 2017 CHPATRI
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+#include <windows.h>
+#include "resource.h"
+
+//
+// Manifest Resources
+//
+#define MANIFEST_RESOURCE_ID 1
+MANIFEST_RESOURCE_ID RT_MANIFEST "CHPATRI.exe.manifest"
+
+//
+// Version Information resources
+//
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+1 VERSIONINFO
+    FILEVERSION     VERSIONc
+    PRODUCTVERSION  VERSIONc
+    FILEOS          VOS_DOS_WINDOWS32
+    FILETYPE        VFT_APP
+    FILESUBTYPE     VFT2_UNKNOWN
+    FILEFLAGSMASK   0x00000000
+#ifdef NDEBUG
+    FILEFLAGS       0x00000000
+#else
+    FILEFLAGS       VS_FF_DEBUG
+#endif
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040901b5"
+        {
+            VALUE "CompanyName", "RadWolfie"
+            VALUE "FileDescription", "Convert HLE Cache File Plus Asm Section To Reverse Engineer Informative Asm File"
+            VALUE "FileVersion", VERSIONs
+            VALUE "LegalCopyright", "Copyright (C) 2017"
+            VALUE "OriginalFilename", "CHPATRI.exe"
+            VALUE "ProductName", "CHPATRI"
+            VALUE "ProductVersion", VERSIONs
+            VALUE "InternalName", "CHPATRI"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x0409, 0x01B5
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+
+//IDI_SMALL         ICON         "CHPATRI.ico"
+
+//
+// Icon resources
+//
+/* Disabled for now.
+LANGUAGE 0, SUBLANG_NEUTRAL
+IDH_ICON           ICON           "CHPATRI.ico"
+*/
+#pragma code_page(65001)
+/////////////////////////////////////////////////////////////////////////////

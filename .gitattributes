@@ -1,0 +1,35 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Custom for Visual Studio
+*.cs     diff=csharp
+
+# Standard to msysgit
+*.doc	 diff=astextplain
+*.DOC	 diff=astextplain
+*.docx diff=astextplain
+*.DOCX diff=astextplain
+*.dot  diff=astextplain
+*.DOT  diff=astextplain
+*.pdf  diff=astextplain
+*.PDF	 diff=astextplain
+*.rtf	 diff=astextplain
+*.RTF	 diff=astextplain
+
+# Standard new line ending
+* text=auto
+*.c text eol=crlf
+*.cpp text eol=crlf
+*.h text eol=crlf
+*.hpp text eol=crlf
+*.inl text eol=crlf
+*.rc text eol=crlf
+*.manifest text eol=crlf
+
+# Standard space requirement
+*.c filter=enforceTabSpace
+*.cpp filter=enforceTabSpace
+*.h filter=enforceTabSpace
+*.hpp filter=enforceTabSpace
+*.inl filter=enforceTabSpace
+*.rc filter=enforceTabSpace
