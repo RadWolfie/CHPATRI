@@ -28,8 +28,8 @@ SOFTWARE.
 
 //Easy editable section for overall begin
 
-#define VERSIONs "0.1.0.0"
-#define VERSIONc 0,1,0,0
+#define VERSIONs "0.1.1.8"
+#define VERSIONc 0,1,1,8
 
 //Easy editable section for overall end
 
