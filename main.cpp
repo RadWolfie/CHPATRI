@@ -26,92 +26,209 @@ SOFTWARE.
 #include <WinBase.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <conio.h>
 #include <map>
 #include <sstream>
 #include <iomanip>
 #include <fstream>
 #include <vector>
 
+#include "third-party\iniFile\iniFile.hpp"
 
-int main(int argc, char** argv) {
+#ifdef _UNICODE
+typedef std::wfstream tfstream;
+typedef std::wstring tstring;
+#define tprintf wprintf
+#define tstricmp _wcsicmp
+#define tstrtol wcstol
+#define tstrlen wcslen
+typedef std::wstringstream tstringstream;
+#else
+typedef std::fstream tfstream;
+typedef std::string tstring;
+#define tprintf printf
+#define tstricmp stricmp
+#define tstrtol strtol
+#define tstrlen strlen
+typedef std::stringstream tstringstream;
+#endif
 
-    if (argc == 1) {
-        printf("INFO: Arg 1 - Virtual Address\n");
-        printf("INFO: Arg 2 - Size of Raw\n");
-        printf("INFO: Arg 3 - HLE Cache ini file\n");
-        printf("INFO: Arg 4 - Library section txt file\n");
-        return 0;
-    } else if (argc != 5) {
-        printf("ERROR: Please input exact arguments...\n");
-        return 0;
-    } else if (argv[1][0] == NULL || argv[2][0] == NULL || argv[3][0] == NULL || argv[4][0] == NULL) {
-        printf("ERROR: Please input valid arguments...\n");
+#define readSettings \
+    if (!settings.keyValue[_T("arg1")].empty()) { \
+        minRange = tstrtol(settings.keyValue[_T("arg1")].c_str(), 0, 16); \
+    } \
+    if (!settings.keyValue[_T("arg2")].empty()) { \
+        maxRange = tstrtol(settings.keyValue[_T("arg2")].c_str(), 0, 16); \
+    } \
+    if (!settings.keyValue[_T("arg3")].empty()) { \
+        hleCacheIn = settings.keyValue[_T("arg3")]; \
+    } \
+    if (!settings.keyValue[_T("arg4")].empty()) { \
+        libraryIn = settings.keyValue[_T("arg4")]; \
+    } \
+    if (!settings.keyValue[_T("arg5")].empty()) { \
+        hleCacheOut = settings.keyValue[_T("arg5")]; \
+    } \
+    if (!settings.keyValue[_T("arg6")].empty()) { \
+        libraryOut = settings.keyValue[_T("arg6")]; \
+    }
+
+int _tmain(int argc, TCHAR** argv) {
+
+    iniFile settings;
+
+    uint32_t minRange;
+    uint32_t maxRange;
+    tstring  hleCacheIn;
+    tstring  hleCacheOut;
+    tstring  libraryIn;
+    tstring  libraryOut;
+
+    // Output help info.
+    if (argc == 2 && tstricmp(argv[1], _T("-h")) == 0) {
+        tprintf(_T("INFO: Arg 1 - Virtual Address\n"));
+        tprintf(_T("INFO: Arg 2 - Size of Raw\n"));
+        tprintf(_T("INFO: Arg 3 - HLE Cache ini file (Input)\n"));
+        tprintf(_T("INFO: Arg 4 - Library section txt file (Input)\n"));
+        tprintf(_T("INFO: Arg 5 - HLE Cache ini file (Output, optional)\n"));
+        tprintf(_T("INFO: Arg 6 - Library section txt file (Output, optional)\n"));
         return 0;
     }
 
-    printf("Verbose test: %s %s %s %s\n", argv[1], argv[2], argv[3], argv[4]);
+    // Read global ini file.
+    if (settings.m_open_file(_T("CHPATRI.ini"))) {
 
-    uint32_t minRange = strtol(argv[1], 0, 16);
-    uint32_t maxRange = strtol(argv[2], 0, 16);
+        tprintf(_T("INFO: Reading CHPATRI.ini file.\n"));
+        readSettings;
+
+        settings.m_close();
+        settings.m_clear();
+    } else {
+        tprintf(_T("INFO: CHPATRI.ini file does not exist, skipping.\n"));
+    }
+
+    // Check arguments count, then determine best place to start.
+    switch (argc) {
+        // TODO: Need to add support for "interactive" mode.
+        case 1: {
+            // Don't need to check maxrange here.
+            if (hleCacheIn.empty() && libraryIn.empty()) {
+                tprintf(_T("INFO: Interactive mode is not supportive at the moment.\n"));
+                return 0;
+            }
+            break;
+        }
+        // Either output help info or read individual ini file by user's drag and drop.
+        case 2: {
+            // Read individual ini file.
+            if (settings.m_open_file(argv[1])) {
+
+                tprintf(_T("INFO: Reading %s file.\n"), argv[1]);
+                readSettings;
+
+                settings.m_close();
+                settings.m_clear();
+            } else {
+                tprintf(_T("ERROR: %s file does not exist.\n"), argv[1]);
+                return 0;
+            }
+            break;
+        }
+        case 6: {
+            libraryOut = argv[6];
+        }
+        case 5: {
+            hleCacheOut = argv[5];
+            break;
+        }
+        default: {
+            if (argc < 5 || argc > 7) {
+                tprintf(_T("ERROR: Please input within range of 4 to 6 arguments requirement...\n"));
+                return 0;
+            } 
+        }
+    }
+
+    if (maxRange == NULL || hleCacheIn.empty() || libraryIn.empty()) {
+        tprintf(_T("ERROR: Please input valid arguments...\n"));
+        return 0;
+    }
+
+    // Use same path as input.
+    if (hleCacheOut.empty()) {
+        hleCacheOut = hleCacheIn.c_str();
+        hleCacheOut.append(_T(".txt"));
+
+    }
+    if (libraryOut.empty()) {
+        libraryOut = libraryIn.c_str();
+        libraryOut.append(_T(".asm"));
+    }
+
+    tprintf(_T("Arg 1: %8X\nArg 2: %8X\nArg 3: %s\nArg 4: %s\nArg 5: %s\nArg 6: %s\n\n"),
+            minRange, maxRange, hleCacheIn.c_str(), libraryIn.c_str(), hleCacheOut.c_str(), libraryOut.c_str());
+
     maxRange += minRange;
 
-    std::map<std::string, std::string> g_SymbolAddresses;
-    char buffer[SHRT_MAX] = { 0 };
-    char* bufferPtr = buffer;
+    std::map<tstring, tstring> g_SymbolAddresses;
+    TCHAR buffer[SHRT_MAX] = { 0 };
+    TCHAR* bufferPtr = buffer;
 
-    DWORD dwRet = GetPrivateProfileSectionA("Symbols", buffer, sizeof(buffer), argv[3]);
+    DWORD dwRet = GetPrivateProfileSection(_T("Symbols"), buffer, sizeof(buffer), hleCacheIn.c_str());
     if (dwRet == SHRT_MAX - 2 || dwRet == 0) {
         printf("ERROR: Unable to read HLE Cache file...\n");
         return 0;
     }
 
     // Parse the .INI file into the map of symbol addresses
-    while (strlen(bufferPtr) > 0) {
-        std::string ini_entry(bufferPtr);
+    while (tstrlen(bufferPtr) > 0) {
+        tstring ini_entry(bufferPtr);
 
         auto separator = ini_entry.find('=');
-        std::string key = ini_entry.substr(0, separator);
-        std::string value = ini_entry.substr(separator + 1, std::string::npos);
-        uint32_t addr = strtol(value.c_str(), 0, 16);
+        tstring key = ini_entry.substr(0, separator);
+        tstring value = ini_entry.substr(separator + 1, std::string::npos);
+        uint32_t addr = tstrtol(value.c_str(), 0, 16);
 
         // Register only specific address range.
         if (minRange <= addr && maxRange >= addr) {
             addr -= minRange;
-            std::stringstream cacheAddress;
-            cacheAddress << std::uppercase << std::hex << std::setw(8) << std::setfill('0') << addr;
+            tstringstream cacheAddress;
+            cacheAddress << std::uppercase << std::hex << std::setw(8) << std::setfill(_T('0')) << addr;
 
             g_SymbolAddresses[key] = cacheAddress.str();
         }
 
 
-        bufferPtr += strlen(bufferPtr) + 1;
+        bufferPtr += tstrlen(bufferPtr) + 1;
     }
-    dwRet = strlen(argv[3]);
-    argv[3][dwRet - 1] = 't';
-    argv[3][dwRet - 2] = 'x';
-    argv[3][dwRet - 3] = 't';
+
+    tfstream fileBuffer;
+
+    fileBuffer.open(hleCacheOut.c_str(), tfstream::out);
 
     // Write the found symbol addresses into the cache file
     for (auto it = g_SymbolAddresses.begin(); it != g_SymbolAddresses.end(); ++it) {
-        WritePrivateProfileStringA("Symbols", (*it).first.c_str(), (*it).second.c_str(), argv[3]);
+        fileBuffer << (*it).first.c_str() << "=" << (*it).second.c_str() << std::endl;
     }
 
-    std::vector<std::string> inFileLineArray;
-    std::string line;
+    fileBuffer.close();
 
-    std::ifstream inFile(argv[4]);
+    std::vector<tstring> inFileLineArray;
+    tstring line;
 
-    if (!inFile.is_open()) {
+    fileBuffer.open(libraryIn.c_str(), tfstream::in);
+
+    if (!fileBuffer.is_open()) {
         printf("ERROR: Unable to open disassembly Library file...\n");
         return 0;
     }
     printf("Reading disassembly library file...\n");
 
     // This is better to put them into "newline" array for add/remove stuff.
-    while (std::getline(inFile, line)) {
+    while (std::getline(fileBuffer, line)) {
         inFileLineArray.push_back(line);
     }
-    inFile.close();
+    fileBuffer.close();
 
     if (inFileLineArray.empty()) {
         printf("ERROR: Unable to read disassembly Library file...\n");
@@ -120,15 +237,10 @@ int main(int argc, char** argv) {
 
     printf("Editing and saving disassembly library, please wait...\n");
 
-    dwRet = strlen(argv[4]);
-    argv[4][dwRet - 3] = 'a';
-    argv[4][dwRet - 2] = 's';
-    argv[4][dwRet - 1] = 'm';
-
     // Save the finalize edited to the file.
-    std::ofstream outFile(argv[4]);
-    
-    if (!outFile.is_open()) {
+    fileBuffer.open(libraryOut.c_str(), tfstream::out);
+
+    if (!fileBuffer.is_open()) {
         printf("ERROR: Unable to create disassembly Library file...\n");
         return 0;
     }
@@ -139,50 +251,50 @@ int main(int argc, char** argv) {
     bool addNewLine = true;
 
     // Now start editing each line.
-    for (std::vector<std::string>::iterator nLine = inFileLineArray.begin(); nLine != inFileLineArray.end(); ++nLine) {
+    for (std::vector<tstring>::iterator nLine = inFileLineArray.begin(); nLine != inFileLineArray.end(); ++nLine) {
 
         //Clean up crew
-        found = nLine->find(" { ");
-        if (found != std::string::npos) {
-            if (nLine->at(found + 3) != '"') {
+        found = nLine->find(_T(" { "));
+        if (found != tstring::npos) {
+            if (nLine->at(found + 3) != _T('"')) {
                 *nLine = nLine->substr(0, found);
             }
         }
 
 
         // Check for ret
-        found = nLine->find(" - ret ");
-        if (found != std::string::npos) {
-            outFile << nLine->c_str() << std::endl;
-            outFile << "" << std::endl;
+        found = nLine->find(_T(" - ret "));
+        if (found != tstring::npos) {
+            fileBuffer << nLine->c_str() << std::endl;
+            fileBuffer << std::endl;
             addNewLine = false;
             continue;
         }
 
         // Then start searching for address matching.
-        for (std::map<std::string, std::string>::iterator it = g_SymbolAddresses.begin(); it != g_SymbolAddresses.end(); ++it) {
+        for (std::map<tstring, tstring>::iterator it = g_SymbolAddresses.begin(); it != g_SymbolAddresses.end(); ++it) {
             found = nLine->find(it->second);
-            if (found != std::string::npos) {
+            if (found != tstring::npos) {
                 if (found == 0) {
                     if (addNewLine) {
-                        outFile << "" << std::endl;
+                        fileBuffer << std::endl;
                     }
-                    outFile << it->first << std::endl;
+                    fileBuffer << it->first << std::endl;
                 } else {
-                    found2 = nLine->find(" call ");
+                    found2 = nLine->find(_T(" call "));
                     if (found2 != std::string::npos) {
-                        if (nLine->at(found - 1) == ' ') {
-                            nLine->append(" (");
+                        if (nLine->at(found - 1) == _T(' ')) {
+                            nLine->append(_T(" ("));
                             nLine->append(it->first);
-                            nLine->append(")");
+                            nLine->append(_T(")"));
                         }
                     } else {
-                        found2 = nLine->find(" jmp ");
+                        found2 = nLine->find(_T(" jmp "));
                         if (found2 != std::string::npos) {
-                            if (nLine->at(found - 1) == ' ') {
-                                nLine->append(" (");
+                            if (nLine->at(found - 1) == _T(' ')) {
+                                nLine->append(_T(" ("));
                                 nLine->append(it->first);
-                                nLine->append(")");
+                                nLine->append(_T(")"));
                             }
                         }
                     }
@@ -190,10 +302,11 @@ int main(int argc, char** argv) {
             }
         }
         addNewLine = true;
-        outFile << nLine->c_str() << std::endl;
+        fileBuffer << nLine->c_str() << std::endl;
     }
-    outFile.close();
+    fileBuffer.close();
 
-    printf("Exiting...");
+    tprintf(_T("Press any key to exit.\n"));
+    _getch();
     return 0;
 }
