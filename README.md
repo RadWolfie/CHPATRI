@@ -26,13 +26,15 @@ CHPATRI.exe 0024CF80 0001FF4C 93bf5881.ini DSOUND.txt rangeDetect.txt DSOUND.asm
 ```
 
 ### Automate Process
-There are up to 6 arguments can be used. Create a global `CHPATRI.ini` file in same directory CHPATRI.exe executable is in. Plus you can also use custom ini file for drag and drop onto CHPATRI.exe file. Be aware of custom ini do overwrite global settings.
+There are up to 6 arguments can be used. Create a global `CHPATRI.ini` file in same directory CHPATRI.exe executable is in. Then add all or a few of these variables from below in CHPATRI.ini file.
 * `arg1=` Virtual Address
 * `arg2=` Size of Raw
 * `arg3=` HLE Cache ini file (Input)
 * `arg4=` Library section txt file (Input)
 * `arg5=` HLE Cache ini file (Output, optional)
 * `arg6=` Library section txt file (Output, optional)
+
+Plus you can also use custom ini file for drag and drop onto CHPATRI.exe file. Be aware of custom ini will overwrite global settings.
 
 **NOTE: arg3 to arg6 does not require any quotes.**
 
