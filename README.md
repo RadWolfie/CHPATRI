@@ -8,17 +8,33 @@
 * Reverse Engineer
 * Informative Asm File
 
+### Feature
+* Input 4 to 6 arguments manually.
+* CHPATRI.ini file as global in same directory with CHPATRI.exe file.
+* Drag and drop custom ini file on CHPATRI.exe file executable.
+
 ### How to Use it
-To use it, you will need to input exact 4 arguments in your command prompt (cmd.exe) in order to process the conversion correctly.
+To use it, you will need to input within range of 4 to 6 arguments in your command prompt (cmd.exe) in order to process conversion correctly. Or use your own ini file to automate process your request. See "**Automate Process**" to find out how.
 
 ```
-CHPATRI.exe <Section's Virtual Address> <Section's Size of Raw> <HLE Cache file name> <Section Asm file>
+CHPATRI.exe <Section's Virtual Address> <Section's Size of Raw> <HLE Cache file name (Input)> <Section Asm file (Input)> [HLE Cache file name (Output, optional)] [Section Asm file (Output, optional)]
 ```
 
 For example with Cel Damage title:
 ```
-CHPATRI.exe 0024CF80 0001FF4C 93bf5881.ini DSOUND.txt
+CHPATRI.exe 0024CF80 0001FF4C 93bf5881.ini DSOUND.txt rangeDetect.txt DSOUND.asm
 ```
+
+### Automate Process
+There are up to 6 arguments can be used. Create a global `CHPATRI.ini` file in same directory CHPATRI.exe executable is in. Plus you can also use custom ini file for drag and drop onto CHPATRI.exe file. Be aware of custom ini do overwrite global settings.
+* `arg1=` Virtual Address
+* `arg2=` Size of Raw
+* `arg3=` HLE Cache ini file (Input)
+* `arg4=` Library section txt file (Input)
+* `arg5=` HLE Cache ini file (Output, optional)
+* `arg6=` Library section txt file (Output, optional)
+
+**NOTE: arg3 to arg6 does not require any quotes.**
 
 ### Steps to take
 **NOTE: Does not necessarily follow in that order.**
