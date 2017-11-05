@@ -291,27 +291,29 @@ int _tmain(int argc, TCHAR** argv) {
                     }
                     fileBuffer << it->first << std::endl;
                     detectAddresses.push_back(it->first);
-                } else {
-                    found2 = nLine->find(_T(" call "));
-                    if (found2 != std::string::npos) {
-                        if (nLine->at(found - 1) == _T(' ')) {
-                            nLine->append(_T(" ("));
-                            nLine->append(it->first);
-                            nLine->append(_T(")"));
-                            usedAddresses[it->first] += 1;
-                        }
-                    } else {
-                        found2 = nLine->find(_T(" jmp "));
-                        if (found2 != std::string::npos) {
-                            if (nLine->at(found - 1) == _T(' ')) {
-                                nLine->append(_T(" ("));
-                                nLine->append(it->first);
-                                nLine->append(_T(")"));
-                                usedAddresses[it->first] += 1;
-                            }
-                        }
-                    }
+                    continue;
                 }
+                found2 = nLine->find(_T(" call "));
+                if (found2 != std::string::npos) {
+                    if (nLine->at(found - 1) == _T(' ')) {
+                        nLine->append(_T(" ("));
+                        nLine->append(it->first);
+                        nLine->append(_T(")"));
+                        usedAddresses[it->first] += 1;
+                    }
+                    continue;
+                } 
+                found2 = nLine->find(_T(" jmp "));
+                if (found2 != std::string::npos) {
+                    if (nLine->at(found - 1) == _T(' ')) {
+                        nLine->append(_T(" ("));
+                        nLine->append(it->first);
+                        nLine->append(_T(")"));
+                        usedAddresses[it->first] += 1;
+                    }
+                    continue;
+                }
+                // Add more asm op code finding here
             }
         }
         addNewLine = true;
