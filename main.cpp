@@ -32,6 +32,7 @@ SOFTWARE.
 #include <iomanip>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 
 #include "third-party\iniFile\iniFile.hpp"
 
@@ -89,7 +90,6 @@ int _tmain(int argc, TCHAR** argv) {
     std::map<tstring, uint32_t> usedAddresses;
     std::vector<tstring>        detectAddresses;
     std::vector<tstring>::iterator  iDetectAddress;
-    std::vector<tstring>::iterator  iDetectAddressEnd;
 
     TCHAR buffer[SHRT_MAX] = { 0 };
     TCHAR* bufferPtr = buffer;
@@ -331,18 +331,19 @@ int _tmain(int argc, TCHAR** argv) {
         return 0;
     }
 
+    std::sort (detectAddresses.begin(), detectAddresses.end());
     iDetectAddress = detectAddresses.begin();
-    iDetectAddressEnd = detectAddresses.end();
 
     // Report error for not found detect addresses.
-    for (std::map<tstring, tstring>::iterator iSymbolAddress; iSymbolAddress != symbolAddresses.end(); iSymbolAddress++) {
-        if (iDetectAddress != iDetectAddressEnd) {
-            break;
+    for (std::map<tstring, tstring>::iterator iSymbolAddress = symbolAddresses.begin(); iSymbolAddress != symbolAddresses.end(); iSymbolAddress++) {
+        if (iDetectAddress == detectAddresses.end()) {
+            fileBuffer << _T("ERROR: Not Found ") << iSymbolAddress->first.c_str() << std::endl;
+            continue;
         }
-        if (iSymbolAddress->first == *iDetectAddress) {
-            iDetectAddress++;
-        }  else {
-            fileBuffer << _T("ERROR: Not Found ") << iDetectAddress->c_str() << std::endl;
+        if (iSymbolAddress->first.compare(*iDetectAddress) == 0) {
+            iDetectAddress = detectAddresses.erase(iDetectAddress);
+        } else {
+            fileBuffer << _T("ERROR: Not Found ") << iSymbolAddress->first.c_str() << std::endl;
         }
     }
 
