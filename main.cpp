@@ -83,6 +83,28 @@ int _tmain(int argc, TCHAR** argv) {
     tstring  hleCacheOut;
     tstring  libraryIn;
     tstring  libraryOut;
+    tstring  hleCacheLog;
+
+    std::map<tstring, tstring>  symbolAddresses;
+    std::map<tstring, uint32_t> usedAddresses;
+    std::vector<tstring>        detectAddresses;
+    std::vector<tstring>::iterator  iDetectAddress;
+    std::vector<tstring>::iterator  iDetectAddressEnd;
+
+    TCHAR buffer[SHRT_MAX] = { 0 };
+    TCHAR* bufferPtr = buffer;
+
+    DWORD dwRet;
+
+    tfstream fileBuffer;
+
+    std::vector<tstring> inFileLineArray;
+    tstring line;
+
+    std::string tempStr;
+    std::size_t found;
+    std::size_t found2;
+    bool addNewLine = true;
 
     // Output help info.
     if (argc == 2 && tstricmp(argv[1], _T("-h")) == 0) {
@@ -165,16 +187,14 @@ int _tmain(int argc, TCHAR** argv) {
         libraryOut.append(_T(".asm"));
     }
 
+    hleCacheLog = hleCacheOut.substr(0, hleCacheOut.length()-4) + _T(".log");
+
     tprintf(_T("Arg 1: %8X\nArg 2: %8X\nArg 3: %s\nArg 4: %s\nArg 5: %s\nArg 6: %s\n\n"),
             minRange, maxRange, hleCacheIn.c_str(), libraryIn.c_str(), hleCacheOut.c_str(), libraryOut.c_str());
 
     maxRange += minRange;
 
-    std::map<tstring, tstring> g_SymbolAddresses;
-    TCHAR buffer[SHRT_MAX] = { 0 };
-    TCHAR* bufferPtr = buffer;
-
-    DWORD dwRet = GetPrivateProfileSection(_T("Symbols"), buffer, sizeof(buffer), hleCacheIn.c_str());
+    dwRet = GetPrivateProfileSection(_T("Symbols"), buffer, sizeof(buffer), hleCacheIn.c_str());
     if (dwRet == SHRT_MAX - 2 || dwRet == 0) {
         printf("ERROR: Unable to read HLE Cache file...\n");
         return 0;
@@ -195,26 +215,21 @@ int _tmain(int argc, TCHAR** argv) {
             tstringstream cacheAddress;
             cacheAddress << std::uppercase << std::hex << std::setw(8) << std::setfill(_T('0')) << addr;
 
-            g_SymbolAddresses[key] = cacheAddress.str();
+            symbolAddresses[key] = cacheAddress.str();
         }
 
 
         bufferPtr += tstrlen(bufferPtr) + 1;
     }
 
-    tfstream fileBuffer;
-
     fileBuffer.open(hleCacheOut.c_str(), tfstream::out);
 
     // Write the found symbol addresses into the cache file
-    for (auto it = g_SymbolAddresses.begin(); it != g_SymbolAddresses.end(); ++it) {
+    for (auto it = symbolAddresses.begin(); it != symbolAddresses.end(); ++it) {
         fileBuffer << (*it).first.c_str() << "=" << (*it).second.c_str() << std::endl;
     }
 
     fileBuffer.close();
-
-    std::vector<tstring> inFileLineArray;
-    tstring line;
 
     fileBuffer.open(libraryIn.c_str(), tfstream::in);
 
@@ -245,11 +260,6 @@ int _tmain(int argc, TCHAR** argv) {
         return 0;
     }
 
-    std::string tempStr;
-    std::size_t found;
-    std::size_t found2;
-    bool addNewLine = true;
-
     // Now start editing each line.
     for (std::vector<tstring>::iterator nLine = inFileLineArray.begin(); nLine != inFileLineArray.end(); ++nLine) {
 
@@ -272,7 +282,7 @@ int _tmain(int argc, TCHAR** argv) {
         }
 
         // Then start searching for address matching.
-        for (std::map<tstring, tstring>::iterator it = g_SymbolAddresses.begin(); it != g_SymbolAddresses.end(); ++it) {
+        for (std::map<tstring, tstring>::iterator it = symbolAddresses.begin(); it != symbolAddresses.end(); ++it) {
             found = nLine->find(it->second);
             if (found != tstring::npos) {
                 if (found == 0) {
@@ -280,6 +290,7 @@ int _tmain(int argc, TCHAR** argv) {
                         fileBuffer << std::endl;
                     }
                     fileBuffer << it->first << std::endl;
+                    detectAddresses.push_back(it->first);
                 } else {
                     found2 = nLine->find(_T(" call "));
                     if (found2 != std::string::npos) {
@@ -287,6 +298,7 @@ int _tmain(int argc, TCHAR** argv) {
                             nLine->append(_T(" ("));
                             nLine->append(it->first);
                             nLine->append(_T(")"));
+                            usedAddresses[it->first] += 1;
                         }
                     } else {
                         found2 = nLine->find(_T(" jmp "));
@@ -295,6 +307,7 @@ int _tmain(int argc, TCHAR** argv) {
                                 nLine->append(_T(" ("));
                                 nLine->append(it->first);
                                 nLine->append(_T(")"));
+                                usedAddresses[it->first] += 1;
                             }
                         }
                     }
@@ -306,7 +319,38 @@ int _tmain(int argc, TCHAR** argv) {
     }
     fileBuffer.close();
 
-    tprintf(_T("Press any key to exit.\n"));
+    tprintf(_T("Saving log file, please wait...\n"));
+
+    // Generate a log report.
+    fileBuffer.open(hleCacheLog.c_str(), tfstream::out);
+
+    if (!fileBuffer.is_open()) {
+        printf("ERROR: Unable to create log file...\n");
+        return 0;
+    }
+
+    iDetectAddress = detectAddresses.begin();
+    iDetectAddressEnd = detectAddresses.end();
+
+    // Report error for not found detect addresses.
+    for (std::map<tstring, tstring>::iterator iSymbolAddress; iSymbolAddress != symbolAddresses.end(); iSymbolAddress++) {
+        if (iDetectAddress != iDetectAddressEnd) {
+            break;
+        }
+        if (iSymbolAddress->first == *iDetectAddress) {
+            iDetectAddress++;
+        }  else {
+            fileBuffer << _T("ERROR: Not Found ") << iDetectAddress->c_str() << std::endl;
+        }
+    }
+
+    // Report count of used address
+    for (std::map<tstring, uint32_t>::iterator iUsedAddress = usedAddresses.begin(); iUsedAddress != usedAddresses.end(); iUsedAddress++) {
+        fileBuffer << _T("INFO: ") << std::setw(4) << iUsedAddress->second << _T("x ") << iUsedAddress->first.c_str() << std::endl;
+    }
+    fileBuffer.close();
+
+    tprintf(_T("Completed!\n\nPress any key to exit.\n"));
     _getch();
     return 0;
 }
