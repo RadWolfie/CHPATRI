@@ -54,6 +54,9 @@ typedef std::string tstring;
 typedef std::stringstream tstringstream;
 #endif
 
+typedef std::map<tstring, tstring> symbol_addr;
+typedef std::map<tstring, uint32_t> used_addr;
+
 #define readSettings \
     if (!settings.keyValue[_T("arg1")].empty()) { \
         minRange = tstrtol(settings.keyValue[_T("arg1")].c_str(), 0, 16); \
@@ -74,25 +77,32 @@ typedef std::stringstream tstringstream;
         libraryOut = settings.keyValue[_T("arg6")]; \
     }
 
+void appendFound(std::vector<tstring>::iterator &nLine, symbol_addr::iterator &symbolAddress, used_addr &usedAddress) {
+    nLine->append(_T(" ("));
+    nLine->append(symbolAddress->first);
+    nLine->append(_T(")"));
+    usedAddress[symbolAddress->first] += 1;
+}
+
 int _tmain(int argc, TCHAR** argv) {
 
     iniFile settings;
 
     uint32_t minRange;
-    uint32_t maxRange;
+    uint32_t maxRange = NULL;
     tstring  hleCacheIn;
     tstring  hleCacheOut;
     tstring  libraryIn;
     tstring  libraryOut;
     tstring  hleCacheLog;
 
-    std::map<tstring, tstring>  symbolAddresses;
-    std::map<tstring, uint32_t> usedAddresses;
+    symbol_addr symbolAddressesRelative;
+    symbol_addr symbolAddressesVirtual;
+    used_addr   usedAddresses;
     std::vector<tstring>        detectAddresses;
     std::vector<tstring>::iterator  iDetectAddress;
 
-    TCHAR buffer[SHRT_MAX] = { 0 };
-    TCHAR* bufferPtr = buffer;
+    TCHAR* bufferPtr = (TCHAR*)calloc(SHRT_MAX, sizeof(short));
 
     DWORD dwRet;
 
@@ -194,7 +204,7 @@ int _tmain(int argc, TCHAR** argv) {
 
     maxRange += minRange;
 
-    dwRet = GetPrivateProfileSection(_T("Symbols"), buffer, sizeof(buffer), hleCacheIn.c_str());
+    dwRet = GetPrivateProfileSection(_T("Symbols"), bufferPtr, SHRT_MAX, hleCacheIn.c_str());
     if (dwRet == SHRT_MAX - 2 || dwRet == 0) {
         printf("ERROR: Unable to read HLE Cache file...\n");
         return 0;
@@ -211,11 +221,16 @@ int _tmain(int argc, TCHAR** argv) {
 
         // Register only specific address range.
         if (minRange <= addr && maxRange >= addr) {
-            addr -= minRange;
             tstringstream cacheAddress;
             cacheAddress << std::uppercase << std::hex << std::setw(8) << std::setfill(_T('0')) << addr;
 
-            symbolAddresses[key] = cacheAddress.str();
+            symbolAddressesVirtual[key] = cacheAddress.str();
+            cacheAddress = tstringstream();
+
+            addr -= minRange;
+            cacheAddress << std::uppercase << std::hex << std::setw(8) << std::setfill(_T('0')) << addr;
+
+            symbolAddressesRelative[key] = cacheAddress.str();
         }
 
 
@@ -225,7 +240,7 @@ int _tmain(int argc, TCHAR** argv) {
     fileBuffer.open(hleCacheOut.c_str(), tfstream::out);
 
     // Write the found symbol addresses into the cache file
-    for (auto it = symbolAddresses.begin(); it != symbolAddresses.end(); ++it) {
+    for (auto it = symbolAddressesRelative.begin(); it != symbolAddressesRelative.end(); ++it) {
         fileBuffer << (*it).first.c_str() << "=" << (*it).second.c_str() << std::endl;
     }
 
@@ -260,6 +275,9 @@ int _tmain(int argc, TCHAR** argv) {
         return 0;
     }
 
+    tstringstream cacheAddress;
+    unsigned newLineCounter = 0;
+
     // Now start editing each line.
     for (std::vector<tstring>::iterator nLine = inFileLineArray.begin(); nLine != inFileLineArray.end(); ++nLine) {
 
@@ -276,40 +294,64 @@ int _tmain(int argc, TCHAR** argv) {
         found = nLine->find(_T(" - ret "));
         if (found != tstring::npos) {
             fileBuffer << nLine->c_str() << std::endl;
-            fileBuffer << std::endl;
-            addNewLine = false;
+            newLineCounter = 0;
             continue;
         }
 
+        if (newLineCounter == 0) {
+            fileBuffer << std::endl;
+            addNewLine = false;
+        }
+
+        newLineCounter++;
+
         // Then start searching for address matching.
-        for (std::map<tstring, tstring>::iterator it = symbolAddresses.begin(); it != symbolAddresses.end(); ++it) {
-            found = nLine->find(it->second);
+        std::map<tstring, tstring>::iterator rel = symbolAddressesRelative.begin();
+        std::map<tstring, tstring>::iterator vir = symbolAddressesVirtual.begin();
+        for (; rel != symbolAddressesRelative.end(); ++rel, ++vir) {
+            // Relative address search
+            found = nLine->find(rel->second);
             if (found != tstring::npos) {
                 if (found == 0) {
                     if (addNewLine) {
                         fileBuffer << std::endl;
                     }
-                    fileBuffer << it->first << std::endl;
-                    detectAddresses.push_back(it->first);
+                    fileBuffer << rel->first << std::endl;
+                    detectAddresses.push_back(rel->first);
                     continue;
                 }
                 found2 = nLine->find(_T(" call "));
                 if (found2 != std::string::npos) {
                     if (nLine->at(found - 1) == _T(' ')) {
-                        nLine->append(_T(" ("));
-                        nLine->append(it->first);
-                        nLine->append(_T(")"));
-                        usedAddresses[it->first] += 1;
+                        appendFound(nLine, rel, usedAddresses);
                     }
                     continue;
-                } 
+                }
                 found2 = nLine->find(_T(" jmp "));
                 if (found2 != std::string::npos) {
                     if (nLine->at(found - 1) == _T(' ')) {
-                        nLine->append(_T(" ("));
-                        nLine->append(it->first);
-                        nLine->append(_T(")"));
-                        usedAddresses[it->first] += 1;
+                        if (newLineCounter == 1) {
+                            newLineCounter = 0;
+                        }
+                        appendFound(nLine, rel, usedAddresses);
+                    }
+                    continue;
+                }
+                // Add more asm op code finding here
+            }
+            // Virtual address search
+            else if ((found = nLine->find(vir->second)) != tstring::npos) {
+                found2 = nLine->find(_T(" call "));
+                if (found2 != std::string::npos) {
+                    if (nLine->at(found - 1) == _T('[')) { //untested
+                        appendFound(nLine, vir, usedAddresses);
+                    }
+                    continue;
+                }
+                found2 = nLine->find(_T(" mov "));
+                if (found2 != std::string::npos) {
+                    if (nLine->at(found - 1) == _T(',')) {
+                        appendFound(nLine, vir, usedAddresses);
                     }
                     continue;
                 }
@@ -335,7 +377,7 @@ int _tmain(int argc, TCHAR** argv) {
     iDetectAddress = detectAddresses.begin();
 
     // Report error for not found detect addresses.
-    for (std::map<tstring, tstring>::iterator iSymbolAddress = symbolAddresses.begin(); iSymbolAddress != symbolAddresses.end(); iSymbolAddress++) {
+    for (std::map<tstring, tstring>::iterator iSymbolAddress = symbolAddressesRelative.begin(); iSymbolAddress != symbolAddressesRelative.end(); iSymbolAddress++) {
         if (iDetectAddress == detectAddresses.end()) {
             fileBuffer << _T("ERROR: Not Found ") << iSymbolAddress->first.c_str() << std::endl;
             continue;
@@ -354,6 +396,6 @@ int _tmain(int argc, TCHAR** argv) {
     fileBuffer.close();
 
     tprintf(_T("Completed!\n\nPress any key to exit.\n"));
-    _getch();
+    (void)_getch();
     return 0;
 }
